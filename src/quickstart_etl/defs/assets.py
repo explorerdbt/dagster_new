@@ -56,3 +56,25 @@ def monitored_pipeline(context: AssetExecutionContext) -> Output:
             "duration_chart": MetadataValue.plotly(fig),
         },
     )
+
+
+from dagster import sensor, RunStatus, SkipReason
+
+@sensor(run_status=RunStatus.SUCCESS)
+def long_running_alert_sensor(context):
+    """
+    Triggers alert if pipeline runtime > 2 minutes
+    """
+
+    run = context.dagster_run
+    if not run.start_time or not run.end_time:
+        return SkipReason("Run timing info not available")
+
+    runtime_seconds = run.end_time - run.start_time
+
+    if runtime_seconds > 120:
+        context.log.warning(
+            f"ALERT: Run took {runtime_seconds} seconds (> 2 minutes)"
+        )
+    else:
+        return SkipReason("Run finished within allowed time")
